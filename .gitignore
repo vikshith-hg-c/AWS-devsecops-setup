@@ -1,3 +1,29 @@
-Devops-init/keys.tfvars
-Devops-init/.terraform
-Devops-init/.terraform.lock.hcl
+# Ignore Terraform state files
+*.tfstate
+*.tfstate.backup
+
+# Ignore crash logs
+crash.log
+
+# Ignore .terraform directory (contains plugin downloads)
+**/.terraform/*
+
+# Ignore .terraform.lock.hcl file (dependency lock file)
+**/.terraform.lock.hcl
+
+# Ignore keys.tfvars (contains sensitive variables like keys)
+**/keys.tfvars
+
+# Ignore override files and temp files
+*.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Ignore .terraformrc and .terraform.d directories
+.terraformrc
+.terraform.d/
+
+# Ignore plan files (optional, depending on your workflow)
+*.tfplan
