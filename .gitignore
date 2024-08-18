@@ -1,1 +1,3 @@
-keys.tfvars
+Devops-init/keys.tfvars
+Devops-init/.terraform
+Devops-init/.terraform.lock.hcl

@@ -2,7 +2,7 @@ resource "aws_vpc" "ap_vpc" {
   cidr_block = "172.16.0.0/16"
   provider   = aws.ap-south-1
   tags = {
-    Name = "React-app"
+    Name = "Devops"
   }
 }
 
