@@ -6,43 +6,65 @@ resource "aws_vpc" "ap_vpc" {
   }
 }
 
-resource "aws_subnet" "ap_private" {
+resource "aws_internet_gateway" "gw" {
+  vpc_id = aws_vpc.ap_vpc.id
+
+  tags = {
+    Name = "Primary"
+  }
+}
+
+resource "aws_subnet" "ops" {
   vpc_id            = aws_vpc.ap_vpc.id
   cidr_block        = "172.16.20.0/24"
   availability_zone = "ap-south-1a"
   provider          = aws.ap-south-1
   tags = {
-    Name = "private_subnet"
+    Name = "ops_subnet"
   }
 }
 
-resource "aws_subnet" "ap_public" {
+resource "aws_subnet" "internal" {
   vpc_id            = aws_vpc.ap_vpc.id
   cidr_block        = "172.16.10.0/24"
   availability_zone = "ap-south-1a"
   provider          = aws.ap-south-1
   tags = {
-    Name = "public_subnet"
+    Name = "internal_subnet"
   }
 }
 
-resource "aws_route_table" "private_route_table" {
+resource "aws_route_table" "internal_route_table" {
   vpc_id = aws_vpc.ap_vpc.id
+  route {
+   cidr_block = "0.0.0.0/0"
+   gateway_id = aws_internet_gateway.gw.id
+  }
+  
   tags = {
-    Name = "private-route-table"
+    Name = "internal-route-table"
   }
 }
 
-resource "aws_route_table_association" "private_route_table_association" {
-  subnet_id      = aws_subnet.ap_private.id
-  route_table_id = aws_route_table.private_route_table.id
+
+
+resource "aws_route_table_association" "internal_to_inetrnal" {
+  subnet_id      = aws_subnet.internal.id
+  route_table_id = aws_route_table.internal_route_table.id
 }
 
-resource "aws_security_group" "private_sg" {
+resource "aws_route_table_association" "ops_to_internal" {
+  subnet_id      = aws_subnet.ops.id
+  route_table_id = aws_route_table.internal_route_table.id
+}
+
+
+
+resource "aws_security_group" "ops_sg" {
   name        = "devSecOps - private subnet"
   description = "Opening 22,443,80,8080,9000"
   vpc_id      = aws_vpc.ap_vpc.id
-  # Define a single ingress rule to allow traffic on all specified ports
+  
   ingress = [
     for port in [22, 80, 443, 8080, 9000] : {
       description      = "TLS from VPC"
@@ -65,41 +87,10 @@ resource "aws_security_group" "private_sg" {
   }
 
   tags = {
-    Name = "devSecOps - private subnet"
+    Name = "ops subnet"
   }
 }
 
-resource "aws_security_group" "public_sg" {
-  name        = "app - public subnet"
-  description = "Opening 3000"
-  vpc_id      = aws_vpc.ap_vpc.id
-
-  # Define a single ingress rule to allow traffic on all specified ports
-  ingress = [
-    for port in [3000] : {
-      description      = "TLS from VPC"
-      from_port        = port
-      to_port          = port
-      protocol         = "tcp"
-      cidr_blocks      = ["0.0.0.0/0"]
-      ipv6_cidr_blocks = []
-      prefix_list_ids  = []
-      security_groups  = []
-      self             = false
-    }
-  ]
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "app - public subnet"
-  }
-}
 
 resource "aws_iam_role" "jenkins-role" {
   name               = "Jenkins"
@@ -139,10 +130,10 @@ resource "aws_instance" "jenkins" {
   ami                    = "ami-0c2af51e265bd5e0e"
   instance_type          = "t2.large"
   key_name               = "mumbai"
-  vpc_security_group_ids = [aws_security_group.private_sg.id]
+  vpc_security_group_ids = [aws_security_group.ops_sg.id]
   user_data              = templatefile("./install_jenkins.sh", {})
   iam_instance_profile   = aws_iam_instance_profile.jenkins_auto.name
-  subnet_id              = aws_subnet.ap_private.id
+  subnet_id              = aws_subnet.ops.id
 
   tags = {
     Name = "Jenkins-Agro"
@@ -151,4 +142,26 @@ resource "aws_instance" "jenkins" {
   root_block_device {
     volume_size = 30
   }
+}
+
+resource "aws_instance" "jump" {
+  ami                    = "ami-0c2af51e265bd5e0e"
+  instance_type          = "t2.micro"
+  key_name               = "mumbai"
+  vpc_security_group_ids = [aws_security_group.ops_sg.id]
+  iam_instance_profile   = aws_iam_instance_profile.jenkins_auto.name
+  subnet_id              = aws_subnet.internal.id
+
+  tags = {
+    Name = "jump"
+  }
+
+  root_block_device {
+    volume_size = 30
+  }
+}
+
+resource "aws_eip" "jump" {
+  instance = aws_instance.jenkins.id
+  domain   = "vpc"
 }
