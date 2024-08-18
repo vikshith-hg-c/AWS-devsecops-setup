@@ -7,10 +7,13 @@ terraform {
   }
 }
 
+variable "access_key" {}
+variable "secret_key" {}
+
 # Configure the AWS Provider
 provider "aws" {
   alias      = "ap-south-1"
   region     = "ap-south-1"
-  access_key = "AKIAUY4SACTXJW4TK3ST"
-  secret_key = "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"
+  access_key = var.access_key
+  secret_key = var.secret_key
 }
